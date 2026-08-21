@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="r7"><rect width="512" height="512" rx="112"/></clipPath>
+  </defs>
+  <g clip-path="url(#r7)">
+    <rect width="256" height="512" fill="#DB2777"/>
+    <rect x="256" width="256" height="512" fill="#7C3AED"/>
+  </g>
+  <circle cx="176" cy="256" r="54" fill="#FFFFFF"/>
+  <text x="176" y="268" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#DB2777" text-anchor="middle">L</text>
+  <circle cx="336" cy="256" r="54" fill="#FFFFFF"/>
+  <text x="336" y="268" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#7C3AED" text-anchor="middle">R</text>
+</svg>
