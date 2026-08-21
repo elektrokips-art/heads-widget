@@ -1,0 +1,445 @@
+<title>Heads Widget Privacy</title>
+<style>
+  :root {
+    --paper: #faf9f6;
+    --surface: #ffffff;
+    --ink: #1c1c1e;
+    --ink-dim: #68666b;
+    --iris: #4527a0;
+    --iris-soft: #efeaf9;
+    --hairline: #e6e3dc;
+    --mono-chip-bg: #f1efe9;
+    --good: #2e7d4f;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #131316;
+      --surface: #1c1c1e;
+      --ink: #f2f1ee;
+      --ink-dim: #9b9ba1;
+      --iris: #a897e8;
+      --iris-soft: #241f38;
+      --hairline: #2c2c31;
+      --mono-chip-bg: #201f24;
+      --good: #6bd499;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #131316;
+    --surface: #1c1c1e;
+    --ink: #f2f1ee;
+    --ink-dim: #9b9ba1;
+    --iris: #a897e8;
+    --iris-soft: #241f38;
+    --hairline: #2c2c31;
+    --mono-chip-bg: #201f24;
+    --good: #6bd499;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 20px 80px;
+  }
+
+  h1, h2, .eyebrow, .toggle-lang, nav.toc a, .chip {
+    font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  code, .mono, table.perms td:first-child, .footer-meta {
+    font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+
+  .page {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  header.top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 48px 0 20px;
+  }
+
+  .mark {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 11px;
+    background: #1c1c1e;
+    position: relative;
+  }
+  .mark svg { position: absolute; inset: 0; }
+
+  .titles h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .titles .eyebrow {
+    margin: 2px 0 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  .lang-switch {
+    display: flex;
+    gap: 6px;
+    margin: 4px 0 8px;
+  }
+  .toggle-lang {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--ink-dim);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .toggle-lang[aria-pressed="true"] {
+    color: var(--iris);
+    border-color: var(--iris);
+    background: var(--iris-soft);
+  }
+
+  nav.toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding: 14px 0 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  nav.toc a {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--iris); border-bottom-color: var(--iris); }
+
+  section { margin-bottom: 44px; }
+  section > h2 {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+    margin: 0 0 4px;
+    scroll-margin-top: 20px;
+  }
+  section > .dek {
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    margin: 0 0 18px;
+  }
+
+  p { margin: 0 0 14px; }
+  ul { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  strong { font-weight: 600; }
+
+  .callout {
+    background: var(--iris-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-size: 0.95rem;
+    margin-bottom: 18px;
+  }
+  .callout b { color: var(--iris); }
+
+  table.perms {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 4px 0 18px;
+    overflow-x: auto;
+    display: block;
+  }
+  table.perms thead { display: table-header-group; }
+  table.perms tbody { display: table-row-group; }
+  table.perms tr { display: table-row; }
+  table.perms th, table.perms td {
+    display: table-cell;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+  table.perms th {
+    font-family: "Manrope", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  table.perms td:first-child {
+    white-space: nowrap;
+    background: var(--mono-chip-bg);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--iris);
+  }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--ink);
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
+
+  footer {
+    border-top: 1px solid var(--hairline);
+    margin-top: 40px;
+    padding-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .footer-meta { font-size: 0.78rem; color: var(--ink-dim); }
+  footer a { color: var(--iris); text-decoration: none; font-weight: 600; font-family: "Manrope", sans-serif; font-size: 0.85rem; }
+  footer a:hover { text-decoration: underline; }
+
+  [data-lang] { display: none; }
+  [data-lang].active { display: block; }
+  span[data-lang].active { display: inline; }
+
+  @media (max-width: 480px) {
+    body { font-size: 16px; }
+    header.top { padding-top: 32px; }
+  }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 512 512" width="44" height="44">
+        <rect x="156" y="220" width="200" height="180" rx="28" fill="#ffffff"/>
+        <rect x="156" y="150" width="200" height="80" rx="28" fill="#3a3a3c"/>
+        <circle cx="216" cy="310" r="34" fill="#1c1c1e"/>
+        <circle cx="296" cy="310" r="34" fill="#1c1c1e"/>
+        <rect x="204" y="270" width="24" height="40" rx="10" fill="#1c1c1e"/>
+        <rect x="284" y="270" width="24" height="40" rx="10" fill="#1c1c1e"/>
+      </svg>
+    </div>
+    <div class="titles">
+      <p class="eyebrow">Heads Widget</p>
+      <h1>Политика конфиденциальности / Privacy Policy</h1>
+    </div>
+  </header>
+
+  <div class="lang-switch" role="group" aria-label="Language">
+    <button class="toggle-lang" data-set-lang="ru" aria-pressed="true">Русский</button>
+    <button class="toggle-lang" data-set-lang="en" aria-pressed="false">English</button>
+  </div>
+
+  <div class="badge-row">
+    <span class="chip"><span class="dot"></span> <span data-lang="ru" class="active">Ничего не отправляется на сервер</span><span data-lang="en">Nothing leaves your device</span></span>
+    <span class="chip"><span class="dot"></span> <span data-lang="ru" class="active">Без рекламы и аналитики</span><span data-lang="en">No ads, no analytics</span></span>
+    <span class="chip"><span class="dot"></span> <span data-lang="ru" class="active">Без аккаунта</span><span data-lang="en">No account required</span></span>
+  </div>
+
+  <nav class="toc" data-lang="ru" aria-label="Разделы">
+    <a href="#data">Какие данные хранятся</a>
+    <a href="#permissions">Разрешения</a>
+    <a href="#thirdparty">Сторонние сервисы</a>
+    <a href="#retention">Хранение и удаление</a>
+    <a href="#children">Дети</a>
+    <a href="#changes">Изменения</a>
+    <a href="#contact">Контакты</a>
+    <a href="#disclaimer">Дисклеймер о брендах</a>
+  </nav>
+  <nav class="toc" data-lang="en" aria-label="Sections">
+    <a href="#data">What's stored</a>
+    <a href="#permissions">Permissions</a>
+    <a href="#thirdparty">Third parties</a>
+    <a href="#retention">Retention &amp; deletion</a>
+    <a href="#children">Children</a>
+    <a href="#changes">Changes</a>
+    <a href="#contact">Contact</a>
+    <a href="#disclaimer">Brand disclaimer</a>
+  </nav>
+
+  <div data-lang="ru" class="active">
+    <section>
+      <p class="dek">Действует с 20 августа 2026. Heads Widget — бесплатное Android-приложение и виджет для рабочего стола, показывающие заряд Bluetooth-наушников.</p>
+      <div class="callout">
+        <b>Коротко:</b> приложение не имеет сервера, не собирает аналитику и не отправляет ничего никуда. Все данные — только на вашем телефоне.
+      </div>
+    </section>
+
+    <section id="data">
+      <h2>Какие данные хранятся</h2>
+      <p>Приложение хранит локально, в стандартном хранилище настроек Android (SharedPreferences), только то, что нужно для его собственной работы:</p>
+      <ul>
+        <li>Адрес и имя выбранных вами Bluetooth-наушников (чтобы виджет знал, какое устройство опрашивать);</li>
+        <li>Последние считанные значения заряда (лево/право/кейс или общий процент) и статус подключения;</li>
+        <li>Выбранные вами настройки внешнего вида виджета (цвет, прозрачность, скругление, интервал обновления);</li>
+        <li>Выбранный язык и тема (светлая/тёмная).</li>
+      </ul>
+      <p>Ничего из этого не покидает устройство — нет сервера, на который это могло бы отправиться.</p>
+    </section>
+
+    <section id="permissions">
+      <h2>Разрешения и зачем они нужны</h2>
+      <table class="perms">
+        <thead><tr><th>Разрешение</th><th>Зачем</th></tr></thead>
+        <tbody>
+          <tr><td>BLUETOOTH_CONNECT</td><td>Увидеть список привязанных устройств и подключиться к выбранным наушникам, чтобы прочитать заряд/установить режим шумоподавления.</td></tr>
+          <tr><td>BLUETOOTH_SCAN</td><td>Только для Apple AirPods/Beats — эти наушники сообщают заряд через пассивное Bluetooth-вещание, не через подключение. Помечено флагом <code>neverForLocation</code>, поэтому не требует доступа к геопозиции.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="thirdparty">
+      <h2>Сторонние сервисы</h2>
+      <p>Приложение не использует аналитику, рекламные SDK или трекеры. Единственный внешний переход — кнопка «GeSys» в настройках, которая по вашему явному нажатию открывает Telegram (или браузер, если Telegram не установлен). Мы не передаём при этом никаких ваших данных — это обычная ссылка.</p>
+    </section>
+
+    <section id="retention">
+      <h2>Хранение и удаление данных</h2>
+      <p>Все данные удаляются вместе с приложением. Чтобы стереть их раньше, не удаляя приложение: Настройки Android → Приложения → Heads Widget → Хранилище → Очистить данные.</p>
+    </section>
+
+    <section id="children">
+      <h2>Дети</h2>
+      <p>Приложение не адресовано детям и не собирает никаких персональных данных ни от кого, включая детей.</p>
+    </section>
+
+    <section id="changes">
+      <h2>Изменения политики</h2>
+      <p>При изменении этой политики дата вверху страницы будет обновлена. Существенные изменения (если данные вообще когда-либо начнут куда-то передаваться) будут явно отмечены.</p>
+    </section>
+
+    <section id="contact">
+      <h2>Контакты</h2>
+      <p>Вопросы — через кнопку «GeSys» в настройках приложения (Telegram) или по этой же ссылке: <a href="https://t.me/qudaro">t.me/qudaro</a>.</p>
+    </section>
+
+    <section id="disclaimer">
+      <h2>Дисклеймер о брендах</h2>
+      <p>Heads Widget — независимый проект, <strong>не связанный, не одобренный и не спонсируемый</strong> компаниями Sony, Apple, Anker (Soundcore), OnePlus, OPPO, realme, vivo или любым другим упомянутым производителем. Названия брендов и моделей используются исключительно для указания совместимости устройств.</p>
+      <p>Протоколы связи с наушниками не получены от производителей и не основаны на их документации (её попросту не существует в открытом доступе) — они изучены и реализованы с нуля на основе анализа открытых проектов <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge">Gadgetbridge</a> (AGPL-3.0), <a href="https://github.com/adolfintel/OpenPods">OpenPods</a> (GPL-3.0) и <a href="https://github.com/CriticalRange/CoreSound">CoreSound</a> (GPL-3.0).</p>
+      <p>Приложение предоставляется «как есть», бесплатно, без каких-либо гарантий совместимости с конкретной моделью или прошивкой наушников.</p>
+    </section>
+  </div>
+
+  <div data-lang="en">
+    <section>
+      <p class="dek">Effective August 20, 2026. Heads Widget is a free Android app and home-screen widget that shows Bluetooth earbuds battery.</p>
+      <div class="callout">
+        <b>Short version:</b> the app has no server, collects no analytics, and sends nothing anywhere. All data stays on your phone.
+      </div>
+    </section>
+
+    <section id="data">
+      <h2>What's stored</h2>
+      <p>The app stores locally, in Android's standard settings storage (SharedPreferences), only what it needs to function:</p>
+      <ul>
+        <li>The address and name of the earbuds you select (so the widget knows which device to poll);</li>
+        <li>The last battery readings (left/right/case, or an overall percentage) and connection status;</li>
+        <li>Your chosen widget appearance settings (color, opacity, corner radius, refresh interval);</li>
+        <li>Your chosen language and theme (light/dark).</li>
+      </ul>
+      <p>None of this leaves the device — there's no server for it to go to.</p>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions and why</h2>
+      <table class="perms">
+        <thead><tr><th>Permission</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>BLUETOOTH_CONNECT</td><td>See your paired devices and connect to the earbuds you pick, to read battery and set noise-control mode.</td></tr>
+          <tr><td>BLUETOOTH_SCAN</td><td>Apple AirPods/Beats only -- these report battery via passive Bluetooth broadcast, not a connection. Flagged <code>neverForLocation</code>, so it doesn't require location access.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="thirdparty">
+      <h2>Third-party services</h2>
+      <p>No analytics, ad SDKs, or trackers. The only outbound link is the "GeSys" button in settings, which -- only when you tap it -- opens Telegram (or a browser if Telegram isn't installed). No data is sent by us in that action; it's a plain link.</p>
+    </section>
+
+    <section id="retention">
+      <h2>Retention &amp; deletion</h2>
+      <p>All data is deleted when the app is uninstalled. To clear it without uninstalling: Android Settings → Apps → Heads Widget → Storage → Clear data.</p>
+    </section>
+
+    <section id="children">
+      <h2>Children</h2>
+      <p>The app isn't directed at children and doesn't collect personal data from anyone, children included.</p>
+    </section>
+
+    <section id="changes">
+      <h2>Changes to this policy</h2>
+      <p>The date at the top will be updated if this policy changes. Any material change (if data were ever to start being transmitted anywhere) would be called out explicitly.</p>
+    </section>
+
+    <section id="contact">
+      <h2>Contact</h2>
+      <p>Questions via the "GeSys" button in the app's settings (Telegram), or directly: <a href="https://t.me/qudaro">t.me/qudaro</a>.</p>
+    </section>
+
+    <section id="disclaimer">
+      <h2>Brand disclaimer</h2>
+      <p>Heads Widget is an independent project, <strong>not affiliated with, endorsed by, or sponsored by</strong> Sony, Apple, Anker (Soundcore), OnePlus, OPPO, realme, vivo, or any other manufacturer named in the app. Brand and model names are used solely to indicate device compatibility.</p>
+      <p>The earbuds communication protocols were not obtained from or based on manufacturer documentation (none is publicly available) -- they were independently studied and implemented from scratch based on the open source projects <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge">Gadgetbridge</a> (AGPL-3.0), <a href="https://github.com/adolfintel/OpenPods">OpenPods</a> (GPL-3.0), and <a href="https://github.com/CriticalRange/CoreSound">CoreSound</a> (GPL-3.0).</p>
+      <p>The app is provided "as is," free of charge, with no guarantee of compatibility with any specific earbuds model or firmware.</p>
+    </section>
+  </div>
+
+  <footer>
+    <span class="footer-meta">Heads Widget · GeSys · последнее обновление 2026-08-20</span>
+    <a href="https://github.com/elektrokips-art/heads-widget">github.com/elektrokips-art/heads-widget</a>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('[data-set-lang]');
+    function setLang(lang) {
+      document.querySelectorAll('[data-lang]').forEach(function (el) {
+        el.classList.toggle('active', el.getAttribute('data-lang') === lang);
+      });
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', b.getAttribute('data-set-lang') === lang ? 'true' : 'false');
+      });
+      try { localStorage.setItem('hw-privacy-lang', lang); } catch (e) {}
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { setLang(b.getAttribute('data-set-lang')); });
+    });
+    var saved = null;
+    try { saved = localStorage.getItem('hw-privacy-lang'); } catch (e) {}
+    if (saved === 'en') setLang('en');
+  })();
+</script>
