@@ -50,6 +50,7 @@ object SoundcoreConnection {
 
     private const val PER_CHANNEL_CONNECT_TIMEOUT_MS = 1500L
     private const val PROBE_RESPONSE_TIMEOUT_MS = 1200L
+    private const val BLOCK_TIMEOUT_MS = 5000L
 
     data class Frame(val category: Int, val type: Int, val payload: ByteArray)
 
@@ -122,22 +123,34 @@ object SoundcoreConnection {
         for (channel in CANDIDATE_CHANNELS) {
             var socket: BluetoothSocket? = null
             val watchdogHandler = Handler(Looper.getMainLooper())
-            val timeoutRunnable = Runnable {
+            fun closeSocket() {
                 try {
                     socket?.close()
                 } catch (e: IOException) {
                     // already closing/closed
                 }
             }
+
+            // A channel that accepts the connection but never speaks the protocol would
+            // otherwise block read() forever: readFrame()'s own deadline is only checked
+            // *between* individual byte reads, not while blocked inside one -- this watchdog
+            // is the thing that actually forces such a channel to give up, by force-closing
+            // the socket out from under it. Stays armed across connect() *and* the initial
+            // probe read for exactly that reason; only cleared once a real answer arrives.
+            val confirmWatchdog = Runnable {
+                Log.w(TAG, "Channel $channel timed out before confirming the protocol, closing")
+                closeSocket()
+            }
+
             try {
                 socket = createInsecureRfcommSocket.invoke(device, channel) as BluetoothSocket
-                watchdogHandler.postDelayed(timeoutRunnable, PER_CHANNEL_CONNECT_TIMEOUT_MS)
+                watchdogHandler.postDelayed(confirmWatchdog, PER_CHANNEL_CONNECT_TIMEOUT_MS + PROBE_RESPONSE_TIMEOUT_MS)
                 socket.connect()
-                watchdogHandler.removeCallbacks(timeoutRunnable)
 
                 socket.outputStream.write(probe)
                 socket.outputStream.flush()
                 val confirmFrame = readFrame(socket.inputStream, PROBE_RESPONSE_TIMEOUT_MS)
+                watchdogHandler.removeCallbacks(confirmWatchdog)
 
                 if (confirmFrame == null) {
                     Log.w(TAG, "Channel $channel connected but silent, trying next")
@@ -146,22 +159,32 @@ object SoundcoreConnection {
                 }
 
                 Log.i(TAG, "Soundcore protocol confirmed on channel $channel")
-                val result = block(socket.inputStream, socket.outputStream, confirmFrame)
+                // Re-armed with more headroom for whatever [block] does (e.g. ANC's own
+                // multi-frame read loop) -- same reasoning as above, just a longer budget
+                // since we now know this is very likely the right channel.
+                val blockWatchdog = Runnable {
+                    Log.w(TAG, "Channel $channel timed out while running block(), closing")
+                    closeSocket()
+                }
+                watchdogHandler.postDelayed(blockWatchdog, BLOCK_TIMEOUT_MS)
+                val result = try {
+                    block(socket.inputStream, socket.outputStream, confirmFrame)
+                } finally {
+                    watchdogHandler.removeCallbacks(blockWatchdog)
+                }
                 socket.close()
                 return result
             } catch (e: IOException) {
                 Log.w(TAG, "Channel $channel refused: ${e.message}")
-                watchdogHandler.removeCallbacks(timeoutRunnable)
-                try {
-                    socket?.close()
-                } catch (closeError: IOException) {
-                    // already closed by watchdog
-                }
+                watchdogHandler.removeCallbacks(confirmWatchdog)
+                closeSocket()
             } catch (e: SecurityException) {
                 Log.e(TAG, "Missing BLUETOOTH_CONNECT permission", e)
+                watchdogHandler.removeCallbacksAndMessages(null)
                 return null
             } catch (e: java.lang.reflect.InvocationTargetException) {
                 Log.w(TAG, "Channel $channel threw on connect: ${e.cause?.message}")
+                watchdogHandler.removeCallbacks(confirmWatchdog)
             }
         }
         return null
