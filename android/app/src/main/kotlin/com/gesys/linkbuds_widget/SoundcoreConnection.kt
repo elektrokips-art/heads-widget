@@ -23,12 +23,12 @@ import java.io.OutputStream
  * the other protocol sources: a from-scratch Kotlin re-implementation of the wire format, not
  * copied code.
  *
- * Confirmed working for battery on Sony/BBK (which connect via SDP+UUID, not a raw channel
- * number); the raw-channel technique here failed on a Soundcore C40i across every candidate
- * channel and both socket security modes (uniform "read failed, ret: -1" right after connect)
- * -- likely an Android/OEM Bluetooth stack limitation with the hidden raw-channel APIs rather
- * than a wrong channel, but unconfirmed without a packet capture. Left in as a best-effort
- * attempt; the reflection fallback covers devices where it doesn't pan out.
+ * A bug report's HCI log (2026-08-21, Soundcore C40i) confirmed CoreSound's curated 8-channel
+ * priority list -- tuned to the Liberty models they captured -- isn't universal: the remote
+ * rejected every one of those channels outright with an RFCOMM DM (Disconnected Mode) response,
+ * i.e. "nothing listening there," not a timeout or a security-mode issue. Hence the full 1-30
+ * sweep below instead of the short list; a clean DM rejection comes back in single-digit
+ * milliseconds so this costs basically nothing even in the worst case.
  *
  * Frame format (host -> device): 08 EE 00 00 00 [category][type][totalLen:2LE][payload][checksum]
  * Frame format (device -> host): 09 FF 00 00 01 [category][type][totalLen:2LE][payload][checksum]
@@ -38,9 +38,15 @@ import java.io.OutputStream
 object SoundcoreConnection {
     private const val TAG = "SoundcoreConnection"
 
-    // Priority order from CoreSound's own channel sweep (it falls back further to 1-30, not
-    // mirrored here to keep worst-case connect time bounded).
-    private val CANDIDATE_CHANNELS = intArrayOf(15, 16, 17, 19, 20, 12, 13, 14)
+    // CoreSound's priority list (15,16,17,19,20,12,13,14) is tuned to the Liberty models they
+    // captured -- confirmed via a real HCI log (2026-08-21, Soundcore C40i) that it's not
+    // universal: the remote rejected every one of those channels with an immediate RFCOMM DM
+    // (Disconnected Mode) response, i.e. "no service on that channel", not a timeout. Since a
+    // DM rejection comes back in single-digit milliseconds (confirmed in that same log), a full
+    // sweep costs well under a second even in the worst case, so there's no real reason to
+    // trim it -- mirrors CoreSound's own eventual 1-30 fallback, just always-on instead of a
+    // second pass after the short list fails.
+    private val CANDIDATE_CHANNELS = (1..30).toList().toIntArray()
 
     private const val PER_CHANNEL_CONNECT_TIMEOUT_MS = 1500L
     private const val PROBE_RESPONSE_TIMEOUT_MS = 1200L
