@@ -25,8 +25,8 @@ object SoundcoreAncControl {
 
     private fun deviceInfoProbe() = SoundcoreConnection.encodeCommand(0x01, 0x01, ByteArray(0))
 
-    fun getMode(device: BluetoothDevice): AncMode? {
-        return SoundcoreConnection.withConnection(device, deviceInfoProbe()) { input, output, _ ->
+    fun getMode(device: BluetoothDevice, deviceName: String): AncMode? {
+        return SoundcoreConnection.withConnection(device, deviceName, deviceInfoProbe()) { input, output, _ ->
             output.write(SoundcoreConnection.encodeCommand(CATEGORY_MODE, TYPE_MODE_GET, ByteArray(0)))
             output.flush()
 
@@ -42,7 +42,7 @@ object SoundcoreAncControl {
         }
     }
 
-    fun setMode(device: BluetoothDevice, mode: AncMode): Boolean {
+    fun setMode(device: BluetoothDevice, deviceName: String, mode: AncMode): Boolean {
         val modeByte = when (mode) {
             AncMode.NOISE_CANCELLING -> MODE_ANC
             AncMode.AMBIENT_SOUND -> MODE_TRANSPARENCY
@@ -56,7 +56,7 @@ object SoundcoreAncControl {
         // actual mode-set command -- the earbuds don't necessarily ack a mode change, so using
         // the set command itself as the confirmation probe would misidentify a good channel as
         // silent.
-        val sent = SoundcoreConnection.withConnection(device, deviceInfoProbe()) { _, output, _ ->
+        val sent = SoundcoreConnection.withConnection(device, deviceName, deviceInfoProbe()) { _, output, _ ->
             output.write(command)
             output.flush()
             true

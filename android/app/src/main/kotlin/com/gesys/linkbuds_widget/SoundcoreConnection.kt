@@ -10,25 +10,21 @@ import java.io.InputStream
 import java.io.OutputStream
 
 /**
- * Anker Soundcore earbuds protocol over classic Bluetooth RFCOMM. Unlike Sony/BBK, Soundcore
- * doesn't advertise a fixed per-model service UUID discoverable via SDP -- the control channel
- * is a plain RFCOMM channel *number*, and which number varies (multipoint mode can shift it).
- * So this connects directly to a channel (via the hidden BluetoothDevice.createInsecureRfcommSocket(int),
- * same category of non-SDK API as the reflection battery fallback elsewhere in this app) and
- * probes candidate channels until one answers the Soundcore protocol.
+ * Anker Soundcore earbuds protocol over classic Bluetooth RFCOMM. Connects via SDP + a
+ * per-model service UUID (see [SoundcoreModels]) using the standard, public
+ * `createInsecureRfcommSocketToServiceRecord(UUID)` API -- the same proven approach as
+ * Sony/BBK elsewhere in this app, and (confirmed by decompiling the official Soundcore app)
+ * what it actually uses itself.
  *
- * Framing and channel list read from the CoreSound project
- * (https://github.com/CriticalRange/CoreSound, GPL-3.0), a desktop Soundcore controller that
- * covers many current models (not just the two Gadgetbridge has) -- same attribution note as
- * the other protocol sources: a from-scratch Kotlin re-implementation of the wire format, not
- * copied code.
+ * An earlier version of this file tried a raw RFCOMM *channel number* instead (ported from the
+ * CoreSound project, a Linux/BlueZ tool where SDP wasn't reliably queryable) -- a real HCI log
+ * from a Soundcore C40i showed every candidate channel getting rejected outright with an
+ * RFCOMM DM response, i.e. that technique doesn't map cleanly onto Android's stack. Standard
+ * SDP+UUID is both simpler and matches what the vendor's own app does.
  *
- * A bug report's HCI log (2026-08-21, Soundcore C40i) confirmed CoreSound's curated 8-channel
- * priority list -- tuned to the Liberty models they captured -- isn't universal: the remote
- * rejected every one of those channels outright with an RFCOMM DM (Disconnected Mode) response,
- * i.e. "nothing listening there," not a timeout or a security-mode issue. Hence the full 1-30
- * sweep below instead of the short list; a clean DM rejection comes back in single-digit
- * milliseconds so this costs basically nothing even in the worst case.
+ * Packet framing read from the CoreSound project (https://github.com/CriticalRange/CoreSound,
+ * GPL-3.0) -- same attribution note as the other protocol sources: a from-scratch Kotlin
+ * re-implementation of the wire format, not copied code.
  *
  * Frame format (host -> device): 08 EE 00 00 00 [category][type][totalLen:2LE][payload][checksum]
  * Frame format (device -> host): 09 FF 00 00 01 [category][type][totalLen:2LE][payload][checksum]
@@ -37,20 +33,7 @@ import java.io.OutputStream
  */
 object SoundcoreConnection {
     private const val TAG = "SoundcoreConnection"
-
-    // CoreSound's priority list (15,16,17,19,20,12,13,14) is tuned to the Liberty models they
-    // captured -- confirmed via a real HCI log (2026-08-21, Soundcore C40i) that it's not
-    // universal: the remote rejected every one of those channels with an immediate RFCOMM DM
-    // (Disconnected Mode) response, i.e. "no service on that channel", not a timeout. Since a
-    // DM rejection comes back in single-digit milliseconds (confirmed in that same log), a full
-    // sweep costs well under a second even in the worst case, so there's no real reason to
-    // trim it -- mirrors CoreSound's own eventual 1-30 fallback, just always-on instead of a
-    // second pass after the short list fails.
-    private val CANDIDATE_CHANNELS = (1..30).toList().toIntArray()
-
-    private const val PER_CHANNEL_CONNECT_TIMEOUT_MS = 1500L
-    private const val PROBE_RESPONSE_TIMEOUT_MS = 1200L
-    private const val BLOCK_TIMEOUT_MS = 5000L
+    private const val CONNECT_TIMEOUT_MS = 8000L
 
     data class Frame(val category: Int, val type: Int, val payload: ByteArray)
 
@@ -105,88 +88,59 @@ object SoundcoreConnection {
     }
 
     /**
-     * Blocking; must be called off the main thread. Tries each candidate channel, confirming
-     * it's the Soundcore control channel by sending [probe] and waiting for a frame back --
-     * that confirmation frame is itself passed to [block] (as [probe] is always the device-info
-     * query, which doubles as a useful response for callers that just want device info; callers
-     * that need something else read/write further on the same streams). Always closes the
-     * socket afterwards.
+     * Blocking; must be called off the main thread. [deviceName] picks the model-specific UUID
+     * (see [SoundcoreModels]) -- null if unrecognized, in which case this doesn't attempt a
+     * connection at all. Sends [probe] once connected, passes the reply to [block] along with
+     * the open streams (mirrors [SonyHeadphonesSession.withSession]'s shape). A single watchdog
+     * covers the whole attempt -- connect, probe write, and whatever [block] does -- since a
+     * connection that succeeds but never speaks the protocol would otherwise block a read()
+     * call forever with nothing able to interrupt it.
      */
-    fun <T> withConnection(device: BluetoothDevice, probe: ByteArray, block: (InputStream, OutputStream, Frame) -> T?): T? {
-        val createInsecureRfcommSocket = try {
-            BluetoothDevice::class.java.getMethod("createInsecureRfcommSocket", Int::class.javaPrimitiveType)
-        } catch (e: NoSuchMethodException) {
-            Log.e(TAG, "createInsecureRfcommSocket(int) not available on this OS build", e)
-            return null
-        }
+    fun <T> withConnection(
+        device: BluetoothDevice,
+        deviceName: String,
+        probe: ByteArray,
+        block: (InputStream, OutputStream, Frame) -> T?
+    ): T? {
+        val uuid = SoundcoreModels.uuidForDeviceName(deviceName) ?: return null
 
-        for (channel in CANDIDATE_CHANNELS) {
-            var socket: BluetoothSocket? = null
-            val watchdogHandler = Handler(Looper.getMainLooper())
-            fun closeSocket() {
-                try {
-                    socket?.close()
-                } catch (e: IOException) {
-                    // already closing/closed
-                }
-            }
-
-            // A channel that accepts the connection but never speaks the protocol would
-            // otherwise block read() forever: readFrame()'s own deadline is only checked
-            // *between* individual byte reads, not while blocked inside one -- this watchdog
-            // is the thing that actually forces such a channel to give up, by force-closing
-            // the socket out from under it. Stays armed across connect() *and* the initial
-            // probe read for exactly that reason; only cleared once a real answer arrives.
-            val confirmWatchdog = Runnable {
-                Log.w(TAG, "Channel $channel timed out before confirming the protocol, closing")
-                closeSocket()
-            }
-
+        var socket: BluetoothSocket? = null
+        val watchdogHandler = Handler(Looper.getMainLooper())
+        val timeoutRunnable = Runnable {
+            Log.w(TAG, "Timed out talking to $deviceName ($uuid), closing socket")
             try {
-                socket = createInsecureRfcommSocket.invoke(device, channel) as BluetoothSocket
-                watchdogHandler.postDelayed(confirmWatchdog, PER_CHANNEL_CONNECT_TIMEOUT_MS + PROBE_RESPONSE_TIMEOUT_MS)
-                socket.connect()
-
-                socket.outputStream.write(probe)
-                socket.outputStream.flush()
-                val confirmFrame = readFrame(socket.inputStream, PROBE_RESPONSE_TIMEOUT_MS)
-                watchdogHandler.removeCallbacks(confirmWatchdog)
-
-                if (confirmFrame == null) {
-                    Log.w(TAG, "Channel $channel connected but silent, trying next")
-                    socket.close()
-                    continue
-                }
-
-                Log.i(TAG, "Soundcore protocol confirmed on channel $channel")
-                // Re-armed with more headroom for whatever [block] does (e.g. ANC's own
-                // multi-frame read loop) -- same reasoning as above, just a longer budget
-                // since we now know this is very likely the right channel.
-                val blockWatchdog = Runnable {
-                    Log.w(TAG, "Channel $channel timed out while running block(), closing")
-                    closeSocket()
-                }
-                watchdogHandler.postDelayed(blockWatchdog, BLOCK_TIMEOUT_MS)
-                val result = try {
-                    block(socket.inputStream, socket.outputStream, confirmFrame)
-                } finally {
-                    watchdogHandler.removeCallbacks(blockWatchdog)
-                }
-                socket.close()
-                return result
+                socket?.close()
             } catch (e: IOException) {
-                Log.w(TAG, "Channel $channel refused: ${e.message}")
-                watchdogHandler.removeCallbacks(confirmWatchdog)
-                closeSocket()
-            } catch (e: SecurityException) {
-                Log.e(TAG, "Missing BLUETOOTH_CONNECT permission", e)
-                watchdogHandler.removeCallbacksAndMessages(null)
-                return null
-            } catch (e: java.lang.reflect.InvocationTargetException) {
-                Log.w(TAG, "Channel $channel threw on connect: ${e.cause?.message}")
-                watchdogHandler.removeCallbacks(confirmWatchdog)
+                // already closing/closed
             }
         }
-        return null
+
+        return try {
+            socket = device.createInsecureRfcommSocketToServiceRecord(uuid)
+            watchdogHandler.postDelayed(timeoutRunnable, CONNECT_TIMEOUT_MS)
+            socket.connect()
+
+            socket.outputStream.write(probe)
+            socket.outputStream.flush()
+            val confirmFrame = readFrame(socket.inputStream, CONNECT_TIMEOUT_MS)
+                ?: throw IOException("No response to probe")
+
+            val result = block(socket.inputStream, socket.outputStream, confirmFrame)
+            watchdogHandler.removeCallbacks(timeoutRunnable)
+            socket.close()
+            result
+        } catch (e: IOException) {
+            Log.w(TAG, "Soundcore connection attempt failed for $deviceName: ${e.message}")
+            watchdogHandler.removeCallbacks(timeoutRunnable)
+            try {
+                socket?.close()
+            } catch (closeError: IOException) {
+                // already closed by watchdog
+            }
+            null
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing BLUETOOTH_CONNECT permission", e)
+            null
+        }
     }
 }

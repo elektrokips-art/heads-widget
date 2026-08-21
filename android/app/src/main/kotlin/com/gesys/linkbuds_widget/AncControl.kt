@@ -33,11 +33,14 @@ class SonyAncSource : AncControlSource {
 }
 
 class SoundcoreAncSource : AncControlSource {
-    // Matches broadly like SoundcoreBatterySource -- see SoundcoreAncControl's doc comment for
-    // why this is the shakiest control path in the app (mode-code mapping isn't confirmed
-    // stable across Soundcore firmware).
-    override fun matches(deviceName: String): Boolean = deviceName.contains("soundcore", ignoreCase = true)
+    // Matches any known model UUID, same as SoundcoreBatterySource -- see
+    // SoundcoreAncControl's doc comment for why this is still the shakiest control path in the
+    // app (mode-code mapping isn't confirmed stable across Soundcore firmware).
+    override fun matches(deviceName: String): Boolean = SoundcoreModels.uuidForDeviceName(deviceName) != null
 
-    override fun getMode(device: BluetoothDevice): AncMode? = SoundcoreAncControl.getMode(device)
-    override fun setMode(device: BluetoothDevice, mode: AncMode): Boolean = SoundcoreAncControl.setMode(device, mode)
+    override fun getMode(device: BluetoothDevice): AncMode? =
+        SoundcoreAncControl.getMode(device, device.name ?: return null)
+
+    override fun setMode(device: BluetoothDevice, mode: AncMode): Boolean =
+        SoundcoreAncControl.setMode(device, device.name ?: return false, mode)
 }

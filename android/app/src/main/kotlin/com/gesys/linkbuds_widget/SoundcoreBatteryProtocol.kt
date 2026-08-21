@@ -15,9 +15,9 @@ object SoundcoreBatteryProtocol {
 
     data class Result(val left: Int?, val right: Int?, val case: Int?)
 
-    fun read(device: BluetoothDevice): Result? {
+    fun read(device: BluetoothDevice, deviceName: String): Result? {
         val probe = SoundcoreConnection.encodeCommand(CATEGORY_DEVICE_INFO, TYPE_DEVICE_INFO, ByteArray(0))
-        return SoundcoreConnection.withConnection(device, probe) { _, _, confirmFrame ->
+        return SoundcoreConnection.withConnection(device, deviceName, probe) { _, _, confirmFrame ->
             // The probe *is* the device-info query, so the channel-confirmation frame already
             // is the response we need -- no further read required.
             if (confirmFrame.category != CATEGORY_DEVICE_INFO || confirmFrame.type != TYPE_DEVICE_INFO) {

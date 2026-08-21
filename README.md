@@ -27,14 +27,16 @@
 Реализация в этом проекте основана на изучении открытых проектов
 [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) (AGPL-3.0),
 [OpenPods](https://github.com/adolfintel/OpenPods) (GPL-3.0) и
-[CoreSound](https://github.com/CriticalRange/CoreSound) (GPL-3.0), с нуля переписана на Kotlin —
-не копипаста их кода, а собственная реализация того же протокола связи.
+[CoreSound](https://github.com/CriticalRange/CoreSound) (GPL-3.0), а таблица UUID моделей
+Soundcore — из декомпиляции официального приложения Soundcore (interoperability reverse
+engineering, тот же принцип). С нуля переписано на Kotlin — не копипаста чужого кода, а
+собственная реализация того же протокола связи.
 
 | Бренд | Батарея | ANC | Статус |
 |---|---|---|---|
 | Sony (LinkBuds S) | L/R/кейс раздельно | Off/NC/Ambient | ✅ подтверждено на реальном железе |
 | Realme / Oppo / OnePlus / vivo (BBK) | L/R/кейс раздельно | — (протокол не даёт) | ✅ батарея подтверждена (Realme); OnePlus/vivo — то же имя протокола, не проверено отдельно |
-| Anker Soundcore (любая модель) | L/R/кейс раздельно | Off/NC/Ambient | ⚠️ переписано под общий протокол (перебор RFCOMM-канала вместо UUID под конкретную модель), ещё не проверено после переписывания |
+| Anker Soundcore (101 модель из каталога) | L/R/кейс раздельно | Off/NC/Ambient | ⚠️ переписано на SDP+UUID по официальному приложению (per-модельный UUID вместо перебора канала), ещё не проверено после переписывания |
 | Apple AirPods / Beats | L/R/кейс раздельно | — (другой протокол, не реализовано) | ⚠️ реализовано, не проверено на железе |
 | Любой другой Bluetooth-девайс | Общий % (если ОС его знает) | — | резервный вариант, работает почти всегда |
 
