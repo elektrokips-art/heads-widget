@@ -8,22 +8,27 @@ import android.util.Log
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * Anker Soundcore earbuds protocol over classic Bluetooth RFCOMM. Unlike Sony/BBK, Soundcore
  * doesn't advertise a fixed per-model service UUID discoverable via SDP -- the control channel
  * is a plain RFCOMM channel *number*, and which number varies (multipoint mode can shift it).
- * So this connects directly to a channel (via the hidden BluetoothDevice.createRfcommSocket(int),
+ * So this connects directly to a channel (via the hidden BluetoothDevice.createInsecureRfcommSocket(int),
  * same category of non-SDK API as the reflection battery fallback elsewhere in this app) and
- * probes a handful of likely channels until one answers the Soundcore protocol.
+ * probes candidate channels until one answers the Soundcore protocol.
  *
  * Framing and channel list read from the CoreSound project
  * (https://github.com/CriticalRange/CoreSound, GPL-3.0), a desktop Soundcore controller that
  * covers many current models (not just the two Gadgetbridge has) -- same attribution note as
  * the other protocol sources: a from-scratch Kotlin re-implementation of the wire format, not
  * copied code.
+ *
+ * Confirmed working for battery on Sony/BBK (which connect via SDP+UUID, not a raw channel
+ * number); the raw-channel technique here failed on a Soundcore C40i across every candidate
+ * channel and both socket security modes (uniform "read failed, ret: -1" right after connect)
+ * -- likely an Android/OEM Bluetooth stack limitation with the hidden raw-channel APIs rather
+ * than a wrong channel, but unconfirmed without a packet capture. Left in as a best-effort
+ * attempt; the reflection fallback covers devices where it doesn't pan out.
  *
  * Frame format (host -> device): 08 EE 00 00 00 [category][type][totalLen:2LE][payload][checksum]
  * Frame format (device -> host): 09 FF 00 00 01 [category][type][totalLen:2LE][payload][checksum]
@@ -33,12 +38,12 @@ import java.util.concurrent.TimeUnit
 object SoundcoreConnection {
     private const val TAG = "SoundcoreConnection"
 
-    // Priority-ordered candidate channels, trimmed from CoreSound's full sweep (which also
-    // falls back to 1-30) to keep worst-case connect time bounded on a mobile background poll.
-    private val CANDIDATE_CHANNELS = intArrayOf(15, 16, 17, 19)
+    // Priority order from CoreSound's own channel sweep (it falls back further to 1-30, not
+    // mirrored here to keep worst-case connect time bounded).
+    private val CANDIDATE_CHANNELS = intArrayOf(15, 16, 17, 19, 20, 12, 13, 14)
 
-    private const val PER_CHANNEL_CONNECT_TIMEOUT_MS = 2500L
-    private const val PROBE_RESPONSE_TIMEOUT_MS = 2000L
+    private const val PER_CHANNEL_CONNECT_TIMEOUT_MS = 1500L
+    private const val PROBE_RESPONSE_TIMEOUT_MS = 1200L
 
     data class Frame(val category: Int, val type: Int, val payload: ByteArray)
 
@@ -101,10 +106,10 @@ object SoundcoreConnection {
      * socket afterwards.
      */
     fun <T> withConnection(device: BluetoothDevice, probe: ByteArray, block: (InputStream, OutputStream, Frame) -> T?): T? {
-        val createRfcommSocket = try {
-            BluetoothDevice::class.java.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+        val createInsecureRfcommSocket = try {
+            BluetoothDevice::class.java.getMethod("createInsecureRfcommSocket", Int::class.javaPrimitiveType)
         } catch (e: NoSuchMethodException) {
-            Log.e(TAG, "createRfcommSocket(int) not available on this OS build", e)
+            Log.e(TAG, "createInsecureRfcommSocket(int) not available on this OS build", e)
             return null
         }
 
@@ -119,7 +124,7 @@ object SoundcoreConnection {
                 }
             }
             try {
-                socket = createRfcommSocket.invoke(device, channel) as BluetoothSocket
+                socket = createInsecureRfcommSocket.invoke(device, channel) as BluetoothSocket
                 watchdogHandler.postDelayed(timeoutRunnable, PER_CHANNEL_CONNECT_TIMEOUT_MS)
                 socket.connect()
                 watchdogHandler.removeCallbacks(timeoutRunnable)

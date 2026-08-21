@@ -29,8 +29,16 @@ class LinkBudsDiagnosticApp extends StatelessWidget {
       title: 'Heads Widget',
       debugShowCheckedModeBanner: false,
       themeMode: settings.themeMode,
-      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true, brightness: Brightness.light),
-      darkTheme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true, brightness: Brightness.dark),
+      theme: ThemeData(
+        colorSchemeSeed: Colors.deepPurple,
+        useMaterial3: true,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.deepPurple,
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
       home: const DiagnosticScreen(),
     );
   }
@@ -72,7 +80,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     // bluetoothScan is only actually used for Apple AirPods/Beats (passive BLE beacon
     // scanning); requesting it upfront alongside bluetoothConnect keeps the permission
     // flow to a single prompt instead of a second one appearing later per-brand.
-    final statuses = await [Permission.bluetoothConnect, Permission.bluetoothScan].request();
+    final statuses = await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+    ].request();
     final granted = statuses[Permission.bluetoothConnect]?.isGranted ?? false;
     setState(() => _permissionGranted = granted);
     if (granted) {
@@ -107,7 +118,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       _status = null;
     });
     try {
-      final status = await NativeBridge.saveSelectedDevice(device.address, device.name);
+      final status = await NativeBridge.saveSelectedDevice(
+        device.address,
+        device.name,
+      );
       if (!mounted) return;
       setState(() {
         _status = status;
@@ -136,14 +150,20 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     final device = _selected;
     if (device == null) return;
     setState(() => _ancBusy = true);
-    final success = await NativeBridge.setAncMode(device.address, device.name, mode);
+    final success = await NativeBridge.setAncMode(
+      device.address,
+      device.name,
+      mode,
+    );
     if (!mounted) return;
     setState(() {
       _ancBusy = false;
       if (success) _ancMode = mode;
     });
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.ancSetFailed)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.ancSetFailed)));
     }
   }
 
@@ -157,13 +177,15 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           IconButton(
             icon: const Icon(Icons.palette_outlined),
             tooltip: t.widgetSettingsTooltip,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
-      body: !_permissionGranted ? _buildPermissionRequest() : _buildDeviceList(),
+      body: !_permissionGranted
+          ? _buildPermissionRequest()
+          : _buildDeviceList(),
     );
   }
 
@@ -196,7 +218,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)));
+      return Center(
+        child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)),
+      );
     }
     if (_devices.isEmpty) {
       return Center(
@@ -207,7 +231,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             children: [
               Text(t.noBondedDevices, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              OutlinedButton(onPressed: _loadDevices, child: Text(t.refreshList)),
+              OutlinedButton(
+                onPressed: _loadDevices,
+                child: Text(t.refreshList),
+              ),
             ],
           ),
         ),
@@ -218,7 +245,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(t.selectDevicePrompt, style: Theme.of(context).textTheme.titleMedium),
+          child: Text(
+            t.selectDevicePrompt,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
         ),
         Expanded(
           child: RadioGroup<BondedDevice>(
@@ -248,48 +278,75 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 
   Widget _buildCheckPanel() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.5,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FilledButton.icon(
-            onPressed: _checking ? null : _saveAndCheck,
-            icon: _checking
-                ? const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.battery_std),
-            label: Text(_checking ? t.connecting : t.saveAndCheck),
-          ),
-          const SizedBox(height: 12),
-          if (_status != null) _buildStatus(_status!),
-          if (_ancMode != null) ...[
-            const SizedBox(height: 16),
-            Text(t.ancSectionTitle, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            SegmentedButton<AncMode>(
-              segments: [
-                ButtonSegment(value: AncMode.off, label: Text(t.ancModeOff)),
-                ButtonSegment(value: AncMode.noiseCancelling, label: Text(t.ancModeNoiseCancelling)),
-                ButtonSegment(value: AncMode.ambientSound, label: Text(t.ancModeAmbientSound)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton.icon(
+                onPressed: _checking ? null : _saveAndCheck,
+                icon: _checking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.battery_std),
+                label: Text(_checking ? t.connecting : t.saveAndCheck),
+              ),
+              const SizedBox(height: 12),
+              if (_status != null) _buildStatus(_status!),
+              if (_ancMode != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  t.ancSectionTitle,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<AncMode>(
+                  segments: [
+                    ButtonSegment(
+                      value: AncMode.off,
+                      label: Text(t.ancModeOff),
+                    ),
+                    ButtonSegment(
+                      value: AncMode.noiseCancelling,
+                      label: Text(t.ancModeNoiseCancelling),
+                    ),
+                    ButtonSegment(
+                      value: AncMode.ambientSound,
+                      label: Text(t.ancModeAmbientSound),
+                    ),
+                  ],
+                  selected: {_ancMode!},
+                  onSelectionChanged: _ancBusy
+                      ? null
+                      : (selection) => _setAncMode(selection.first),
+                ),
               ],
-              selected: {_ancMode!},
-              onSelectionChanged: _ancBusy ? null : (selection) => _setAncMode(selection.first),
-            ),
-          ],
-          if (_saved) ...[
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 4),
-            Text(t.widgetSavedInstructions, style: const TextStyle(fontSize: 12)),
-          ],
-        ],
+              if (_saved) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 4),
+                Text(
+                  t.widgetSavedInstructions,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -306,7 +363,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       );
     }
     if (status.fallback != null) {
-      return Text(t.fallbackOnly(status.fallback!), textAlign: TextAlign.center);
+      return Text(
+        t.fallbackOnly(status.fallback!),
+        textAlign: TextAlign.center,
+      );
     }
     return Text(
       t.noDataAtAll,
